@@ -160,3 +160,5 @@ cython_debug/
 #.idea/
 # models
 models/
+# personal notes
+src/notas.txt
