@@ -1,6 +1,7 @@
 import os
 from typing import List, Union
 
+from dotenv import load_dotenv
 from faster_whisper import WhisperModel, download_model
 from src.config import ModelConfig, VadInitialPromptMode
 from src.hooks.progressListener import ProgressListener
@@ -8,6 +9,8 @@ from src.languages import get_language_from_name
 from src.modelCache import ModelCache
 from src.whisper.abstractWhisperContainer import AbstractWhisperCallback, AbstractWhisperContainer
 from src.utils import format_timestamp
+
+load_dotenv()
 
 class FasterWhisperContainer(AbstractWhisperContainer):
     def __init__(self, model_name: str, device: str = None, compute_type: str = "float16",
@@ -21,9 +24,10 @@ class FasterWhisperContainer(AbstractWhisperContainer):
         passing the container to a subprocess.
         """
         model_config = self._get_model_config()
-        
-        if os.path.isdir(model_config.url):
-            model_config.path = model_config.url
+        resolved = self._resolve_model_path(model_config)
+
+        if os.path.isdir(resolved):
+            model_config.path = resolved
         else:
             model_config.path = download_model(model_config.url, output_dir=self.download_root)
 
@@ -47,11 +51,28 @@ class FasterWhisperContainer(AbstractWhisperContainer):
 
         if (device is None):
             device = "auto"
-        # model_path = FASTER_WHISPER_MODELS_PATH[model_config.url]
-        model_path = os.path.join(os.path.join("models", "faster-whisper"),model_config.url)
-        # model = WhisperModel(model_config.url, device=device, compute_type=self.compute_type)
+
+        model_path = self._resolve_model_path(model_config)
+        print("Loading model from: " + str(model_path))
         model = WhisperModel(model_size_or_path=model_path, device=device, compute_type=self.compute_type)
         return model
+
+    def _resolve_model_path(self, model_config: ModelConfig) -> str:
+        """
+        Resolve the model path:
+        1. FASTER_WHISPER_MODEL_DIR env var (from .env) + model name
+        2. Otherwise pass the model name as-is to WhisperModel, which checks
+           the huggingface cache and auto-downloads if needed
+        """
+        model_name = model_config.url
+        env_dir = os.environ.get("FASTER_WHISPER_MODEL_DIR")
+
+        if env_dir:
+            custom_path = os.path.join(env_dir, model_name)
+            if os.path.isdir(custom_path):
+                return custom_path
+
+        return model_name
 
     def create_callback(self, language: str = None, task: str = None, initial_prompt: str = None, 
                         initial_prompt_mode: VadInitialPromptMode = VadInitialPromptMode.PREPREND_FIRST_SEGMENT, 
