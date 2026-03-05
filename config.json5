@@ -23,8 +23,16 @@
             "url": "large"
         },
         {
+            "name": "medium.en",
+            "url": "medium.en"
+        },
+        {
             "name": "large-v2",
             "url": "large-v2"
+        },
+        {
+            "name": "large-v3",
+            "url": "large-v3"
         },
         // Uncomment to add custom Japanese models
         //{

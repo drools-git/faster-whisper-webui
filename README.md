@@ -26,6 +26,7 @@ This is a fork of [aadnk/whisper-webui](https://gitlab.com/aadnk/whisper-webui) 
 - **Transcription timing** -- Console shows total processing time and audio duration after each job.
 - **YouTube video download** -- After extracting audio for transcription, the full video is also saved to a `downloads/` folder.
 - **UI cleanup** -- Removed duplicate Chinese labels, English-only interface. Language selector pins English and Spanish at the top with a separator.
+- **Added `large-v3` and `medium.en` models** to the available model list.
 - **Default language set to English** in `config.json5`.
 
 # Running Locally

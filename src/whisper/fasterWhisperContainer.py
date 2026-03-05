@@ -44,7 +44,7 @@ class FasterWhisperContainer(AbstractWhisperContainer):
         import torch
         model_config = self._get_model_config()
         
-        if model_config.type == "whisper" and model_config.url not in ["tiny", "base", "small", "medium", "large", "large-v2"]:
+        if model_config.type == "whisper" and model_config.url not in ["tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large", "large-v1", "large-v2", "large-v3"]:
             raise Exception("FasterWhisperContainer does not yet support Whisper models. Use ct2-transformers-converter to convert the model to a faster-whisper model.")
 
         device = self.device
