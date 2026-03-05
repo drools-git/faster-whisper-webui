@@ -13,7 +13,20 @@ license: apache-2.0
 
 Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
 
-This is a copy for [aadnk/whisper-webui](https://gitlab.com/aadnk/whisper-webui),I made modifications based on this for personal use.
+This is a fork of [aadnk/whisper-webui](https://gitlab.com/aadnk/whisper-webui) with several fixes and improvements.
+
+## Changes from upstream
+
+- **Fixed silent hang on Windows** -- Disabled `auto_parallel` (caused multiprocessing deadlocks with CUDA on Windows) and set Gradio `quiet=False` for visible console output.
+- **Upgraded Gradio** -- From 3.23.0 to 3.45.2, fixing broken queue/worker behavior on Windows.
+- **Flexible model path resolution** -- Models no longer need to be inside the project. Set `FASTER_WHISPER_MODEL_DIR` in a `.env` file to point to a shared models folder. If a model isn't found there, faster-whisper uses its default HuggingFace cache. See `.env.example`.
+- **GPU detection and device passthrough** -- The config `device` setting is now properly passed to the model container. Console shows CUDA GPU name, model path, and load time on startup.
+- **Whisper retry for uncovered audio** -- When whisper stops transcribing before the end of a VAD segment (e.g. quiet speech at the end of a clip), the remaining audio is automatically re-processed to avoid losing content.
+- **Simple tab respects config options** -- The simple tab now passes all whisper parameters from `config.json5` (`no_speech_threshold`, `beam_size`, `temperature`, etc.) instead of ignoring them.
+- **Transcription timing** -- Console shows total processing time and audio duration after each job.
+- **YouTube video download** -- After extracting audio for transcription, the full video is also saved to a `downloads/` folder.
+- **UI cleanup** -- Removed duplicate Chinese labels, English-only interface. Language selector pins English and Spanish at the top with a separator.
+- **Default language set to English** in `config.json5`.
 
 # Running Locally
 
@@ -21,24 +34,19 @@ To run this program locally, first install Python 3.9+ and Git. Then install Pyt
 ```
 pip install -r requirements.txt
 ```
-The project model is loaded locally and requires creating a `models` directory in the project path, and placing the model files in the following format.
+The Silero VAD model must be cloned locally into a `models/silero-vad` directory inside the project:
 ```
-├─faster-whisper
-│  ├─base
-│  ├─large
-│  ├─large-v2
-│  ├─medium
-│  ├─small
-│  └─tiny
+models/
 └─silero-vad
-    ├─examples
-    │  ├─cpp
-    │  ├─microphone_and_webRTC_integration
-    │  └─pyaudio-streaming
-    ├─files
-    └─__pycache__
 ```
-### model download path
+
+For faster-whisper models, you have three options:
+
+1. **Shared folder via `.env`** (recommended) -- Copy `.env.example` to `.env` and set `FASTER_WHISPER_MODEL_DIR` to your models folder (e.g. `C:\AI\MODELS\FASTER-WHISPER`). The app looks for `<dir>/<model_name>` when you select a model.
+2. **Default HuggingFace cache** -- Leave `.env` empty or don't create it. Faster-whisper will use `~/.cache/huggingface/hub/` and auto-download models on first use.
+3. **Project-local folder** -- Place models in `models/faster-whisper/<model_name>` inside the project (original behavior).
+
+### Model download links
 
 [faster-whisper](https://huggingface.co/guillaumekln)
 
