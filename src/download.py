@@ -8,6 +8,8 @@ from yt_dlp.postprocessor import PostProcessor
 
 DOWNLOADS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "downloads")
 
+last_downloaded_video_path = None
+
 class FilenameCollectorPP(PostProcessor):
     def __init__(self):
         super(FilenameCollectorPP, self).__init__(None)
@@ -73,8 +75,11 @@ def _perform_download(url: str, maxDuration: int = None, outputTemplate: str = N
         print("Downloaded " + filename)
 
     # Also save the full video to the downloads folder
+    global last_downloaded_video_path
+    last_downloaded_video_path = None
     try:
         os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+        video_filename_collector = FilenameCollectorPP()
         video_opts = {
             "format": "bestvideo+bestaudio/best",
             "paths": {"home": DOWNLOADS_DIR},
@@ -85,8 +90,11 @@ def _perform_download(url: str, maxDuration: int = None, outputTemplate: str = N
         if playlistItems:
             video_opts["playlist_items"] = playlistItems
         with YoutubeDL(video_opts) as ydl:
+            ydl.add_post_processor(video_filename_collector)
             ydl.download([url])
-        print("Video saved to " + DOWNLOADS_DIR)
+        if video_filename_collector.filenames:
+            last_downloaded_video_path = video_filename_collector.filenames[0]
+            print("Video saved: " + last_downloaded_video_path)
     except Exception as e:
         print("Could not save video copy: " + str(e))
 

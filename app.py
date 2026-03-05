@@ -28,7 +28,8 @@ import ffmpeg
 # UI
 import gradio as gr
 
-from src.download import ExceededMaximumDuration, download_url
+from src.download import ExceededMaximumDuration, download_url, DOWNLOADS_DIR
+import src.download as download_module
 from src.utils import slugify, write_srt, write_vtt
 from src.vad import AbstractTranscription, NonSpeechStrategy, PeriodicTranscriptionConfig, TranscriptionConfig, VadPeriodicTranscription, VadSileroTranscription
 from src.whisper.abstractWhisperContainer import AbstractWhisperContainer
@@ -389,6 +390,18 @@ class WhisperTranscriber:
         output_files.append(self.__create_file(srt, output_dir, source_name + "-subs.srt"));
         output_files.append(self.__create_file(vtt, output_dir, source_name + "-subs.vtt"));
         output_files.append(self.__create_file(text, output_dir, source_name + "-transcript.txt"));
+
+        # Copy SRT to downloads folder matching the video filename
+        video_path = download_module.last_downloaded_video_path
+        if video_path and os.path.isfile(video_path):
+            try:
+                srt_name = os.path.splitext(os.path.basename(video_path))[0] + ".srt"
+                srt_dest = os.path.join(DOWNLOADS_DIR, srt_name)
+                with open(srt_dest, "w", encoding="utf-8") as f:
+                    f.write(srt)
+                print("SRT saved: " + srt_dest)
+            except Exception as e:
+                print("Could not save SRT to downloads: " + str(e))
 
         return output_files, text, vtt
 

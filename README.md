@@ -24,7 +24,7 @@ This is a fork of [aadnk/whisper-webui](https://gitlab.com/aadnk/whisper-webui) 
 - **Whisper retry for uncovered audio** -- When whisper stops transcribing before the end of a VAD segment (e.g. quiet speech at the end of a clip), the remaining audio is automatically re-processed to avoid losing content.
 - **Simple tab respects config options** -- The simple tab now passes all whisper parameters from `config.json5` (`no_speech_threshold`, `beam_size`, `temperature`, etc.) instead of ignoring them.
 - **Transcription timing** -- Console shows total processing time and audio duration after each job.
-- **YouTube video download** -- After extracting audio for transcription, the full video is also saved to a `downloads/` folder.
+- **YouTube video + subtitles download** -- After extracting audio for transcription, the full video and a matching SRT file are saved to a `downloads/` folder with the same base name (e.g. `Title [id].mkv` + `Title [id].srt`), so media players auto-detect subtitles.
 - **UI cleanup** -- Removed duplicate Chinese labels, English-only interface. Language selector pins English and Spanish at the top with a separator.
 - **Added `large-v3` and `medium.en` models** to the available model list.
 - **Default language set to English** in `config.json5`.
