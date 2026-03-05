@@ -1,5 +1,6 @@
 from datetime import datetime
 import math
+import time
 from typing import Iterator, Union
 import argparse
 
@@ -93,7 +94,12 @@ class WhisperTranscriber:
         
         vadOptions = VadOptions(vad, vadMergeWindow, vadMaxMergeSize, vadPadding, vadPromptWindow, self.app_config.vad_initial_prompt_mode)
 
-        return self.transcribe_webui(modelName, languageName, urlData, multipleFiles, microphoneData, task, vadOptions, progress=progress)
+        return self.transcribe_webui(modelName, languageName, urlData, multipleFiles, microphoneData, task, vadOptions, progress=progress,
+                                     temperature=self.app_config.temperature, best_of=self.app_config.best_of, beam_size=self.app_config.beam_size,
+                                     patience=self.app_config.patience, length_penalty=self.app_config.length_penalty, suppress_tokens=self.app_config.suppress_tokens,
+                                     condition_on_previous_text=self.app_config.condition_on_previous_text, fp16=self.app_config.fp16,
+                                     compression_ratio_threshold=self.app_config.compression_ratio_threshold,
+                                     logprob_threshold=self.app_config.logprob_threshold, no_speech_threshold=self.app_config.no_speech_threshold)
 
     # Entry function for the full tab
     def transcribe_webui_full(self, modelName, languageName, urlData, multipleFiles, microphoneData, task, 
@@ -136,11 +142,13 @@ class WhisperTranscriber:
             sources = self.__get_source(urlData, multipleFiles, microphoneData)
             
             try:
+                job_start_time = time.time()
                 selectedLanguage = languageName.lower() if len(languageName) > 0 else None
                 selectedModel = modelName if modelName is not None else "base"
 
                 model = create_whisper_container(whisper_implementation=self.app_config.whisper_implementation, 
-                                                 model_name=selectedModel, compute_type=self.app_config.compute_type, 
+                                                 model_name=selectedModel, device=self.app_config.device,
+                                                 compute_type=self.app_config.compute_type, 
                                                  cache=self.model_cache, models=self.app_config.models)
 
                 # Result
@@ -225,6 +233,12 @@ class WhisperTranscriber:
                             zip.write(download_file, arcname=zip_file_name)
 
                     download.insert(0, downloadAllPath)
+
+                elapsed = time.time() - job_start_time
+                print(f"\n{'='*50}")
+                print(f">> Transcription completed in {elapsed:.2f}s")
+                print(f">> Audio processed: {total_duration:.1f}s")
+                print(f"{'='*50}\n")
 
                 return download, text, vtt
 
@@ -446,72 +460,68 @@ def create_ui(app_config: ApplicationConfig):
     ui_description = implementation_name + " is a general-purpose speech recognition model. It is trained on a large dataset of diverse " 
     ui_description += " audio and is also a multi-task model that can perform multilingual speech recognition "
     ui_description += " as well as speech translation and language identification. "
-    ui_description += "\n\n\n\n"+implementation_name+" 是一个通用的语音识别模型。它是在大量不同语音数据集上进行训练的多任务模型，可以执行多语言语音识别、语音翻译和语言识别。"
     ui_description += "\n\n\n\nFor longer audio files (>10 minutes) not in English, it is recommended that you select Silero VAD (Voice Activity Detector) in the VAD option."
-    ui_description += "\n\n\n\n对于长度超过10分钟且非英语的音频文件，建议在语音活动检测选项中选择Silero VAD（Voice Activity Detector）。"
     # Recommend faster-whisper
     if is_whisper:
         ui_description += "\n\n\n\nFor faster inference on GPU, try [faster-whisper](https://huggingface.co/spaces/aadnk/faster-whisper-webui)."
 
     if app_config.input_audio_max_duration > 0:
         ui_description += "\n\n" + "Max audio file length: " + str(app_config.input_audio_max_duration) + " s"
-        ui_description += "\n\n" + "音频文件最大长度: " + str(app_config.input_audio_max_duration) + " s"
 
     ui_article = "Read the [documentation here](https://gitlab.com/aadnk/whisper-webui/-/blob/main/docs/options.md)."
 
     whisper_models = app_config.get_model_names()
 
     simple_inputs = lambda : [
-        gr.Dropdown(choices=whisper_models, value=app_config.default_model_name, label="Model/模型"),
-        gr.Dropdown(choices=sorted(get_language_names()), label="Language/语言(为空时自动识别)", value=app_config.language),
-        gr.Text(label="URL (YouTube, etc.)/链接(YouTube,其他)"),
-        gr.File(label="Upload Files/上传文件", file_count="multiple"),
-        gr.Audio(source="microphone", type="filepath", label="Microphone Input/麦克风输入"),
-        gr.Dropdown(choices=["transcribe", "translate"], label="Task/任务", value=app_config.task),
-        gr.Dropdown(choices=["none", "silero-vad", "silero-vad-skip-gaps", "silero-vad-expand-into-gaps", "periodic-vad"], value=app_config.default_vad, label="VAD/语音活性检测"),
-        gr.Number(label="VAD - Merge Window (s)/VAD - 合并窗口（秒）", precision=0, value=app_config.vad_merge_window),
-        gr.Number(label="VAD - Max Merge Size (s)/VAD - 最大合并大小（秒）", precision=0, value=app_config.vad_max_merge_size),
-        gr.Number(label="VAD - Padding (s)/VAD - 填充（秒）", precision=None, value=app_config.vad_padding),
-        gr.Number(label="VAD - Prompt Window (s)/VAD - 提示窗口（秒）", precision=None, value=app_config.vad_prompt_window),
+        gr.Dropdown(choices=whisper_models, value=app_config.default_model_name, label="Model"),
+        gr.Dropdown(choices=sorted(get_language_names()), label="Language (auto-detect if empty)", value=app_config.language),
+        gr.Text(label="URL (YouTube, etc.)"),
+        gr.File(label="Upload Files", file_count="multiple"),
+        gr.Audio(source="microphone", type="filepath", label="Microphone Input"),
+        gr.Dropdown(choices=["transcribe", "translate"], label="Task", value=app_config.task),
+        gr.Dropdown(choices=["none", "silero-vad", "silero-vad-skip-gaps", "silero-vad-expand-into-gaps", "periodic-vad"], value=app_config.default_vad, label="VAD"),
+        gr.Number(label="VAD - Merge Window (s)", precision=0, value=app_config.vad_merge_window),
+        gr.Number(label="VAD - Max Merge Size (s)", precision=0, value=app_config.vad_max_merge_size),
+        gr.Number(label="VAD - Padding (s)", precision=None, value=app_config.vad_padding),
+        gr.Number(label="VAD - Prompt Window (s)", precision=None, value=app_config.vad_prompt_window),
     ]
 
     is_queue_mode = app_config.queue_concurrency_count is not None and app_config.queue_concurrency_count > 0    
 
     simple_transcribe = gr.Interface(fn=ui.transcribe_webui_simple_progress if is_queue_mode else ui.transcribe_webui_simple, 
                                      description=ui_description, article=ui_article, inputs=simple_inputs(), outputs=[
-        gr.File(label="Download/下载"),
-        gr.Text(label="Transcription/转录"), 
-        gr.Text(label="Segments/分段")
+        gr.File(label="Download"),
+        gr.Text(label="Transcription"), 
+        gr.Text(label="Segments")
     ])
 
-    full_description = ui_description + "\n\n\n\n" + "Be careful when changing some of the options in the full interface - this can cause the model to crash."
-    full_description = full_description + "\n\n\n\n" + "<font style='color:red'>在完整界面中更改某些选项时要小心，否则可能会导致模型崩溃。</font>"
+    full_description = ui_description + "\n\n\n\n" + "<font style='color:red'>Be careful when changing some of the options in the full interface - this can cause the model to crash.</font>"
     full_transcribe = gr.Interface(fn=ui.transcribe_webui_full_progress if is_queue_mode else ui.transcribe_webui_full,
                                    description=full_description, article=ui_article, inputs=[
         *simple_inputs(),
-        gr.Dropdown(choices=["prepend_first_segment", "prepend_all_segments"], value=app_config.vad_initial_prompt_mode, label="VAD - Initial Prompt Mode/VAD - 初始提示模式"),
-        gr.TextArea(label="Initial Prompt/初始提示"),
-        gr.Number(label="Temperature/温度", value=app_config.temperature),
-        gr.Number(label="Best Of - Non-zero temperature/最佳结果 - 非零温度", value=app_config.best_of, precision=0),
-        gr.Number(label="Beam Size - Zero temperature/束搜索大小 - 零温度", value=app_config.beam_size, precision=0),
-        gr.Number(label="Patience - Zero temperature/耐心 - 零温度", value=app_config.patience),
-        gr.Number(label="Length Penalty - Any temperature/长度惩罚 - 任何温度", value=app_config.length_penalty), 
-        gr.Text(label="Suppress Tokens - Comma-separated list of token IDs/抑制标记 - 逗号分隔的标记ID列表", value=app_config.suppress_tokens),
-        gr.Checkbox(label="Condition on previous text/以前文为条件", value=app_config.condition_on_previous_text),
+        gr.Dropdown(choices=["prepend_first_segment", "prepend_all_segments"], value=app_config.vad_initial_prompt_mode, label="VAD - Initial Prompt Mode"),
+        gr.TextArea(label="Initial Prompt"),
+        gr.Number(label="Temperature", value=app_config.temperature),
+        gr.Number(label="Best Of - Non-zero temperature", value=app_config.best_of, precision=0),
+        gr.Number(label="Beam Size - Zero temperature", value=app_config.beam_size, precision=0),
+        gr.Number(label="Patience - Zero temperature", value=app_config.patience),
+        gr.Number(label="Length Penalty - Any temperature", value=app_config.length_penalty), 
+        gr.Text(label="Suppress Tokens - Comma-separated list of token IDs", value=app_config.suppress_tokens),
+        gr.Checkbox(label="Condition on previous text", value=app_config.condition_on_previous_text),
         gr.Checkbox(label="FP16", value=app_config.fp16),
-        gr.Number(label="Temperature increment on fallback/回退时温度增量", value=app_config.temperature_increment_on_fallback),
-        gr.Number(label="Compression ratio threshold/压缩比阈值", value=app_config.compression_ratio_threshold),
-        gr.Number(label="Logprob threshold/Logprob阈值", value=app_config.logprob_threshold),
-        gr.Number(label="No speech threshold/无语音阈值", value=app_config.no_speech_threshold)
+        gr.Number(label="Temperature increment on fallback", value=app_config.temperature_increment_on_fallback),
+        gr.Number(label="Compression ratio threshold", value=app_config.compression_ratio_threshold),
+        gr.Number(label="Logprob threshold", value=app_config.logprob_threshold),
+        gr.Number(label="No speech threshold", value=app_config.no_speech_threshold)
     ], outputs=[
-        gr.File(label="Download/下载"),
-        gr.Text(label="Transcription/转录"), 
-        gr.Text(label="Segments/分段")
+        gr.File(label="Download"),
+        gr.Text(label="Transcription"), 
+        gr.Text(label="Segments")
     ])
     document = gr.Markdown(
         get_description
     )
-    demo = gr.TabbedInterface([simple_transcribe, full_transcribe,document], tab_names=["Simple/基础版", "Full/完整版","document(说明文档)"])
+    demo = gr.TabbedInterface([simple_transcribe, full_transcribe,document], tab_names=["Simple", "Full", "Documentation"])
 
     # Queue up the demo
     if is_queue_mode:

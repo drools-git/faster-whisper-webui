@@ -157,6 +157,7 @@ class AbstractTranscription(ABC):
 
         try:
             max_audio_duration = self.get_audio_duration(audio, config)
+            print(f">> Audio total duration: {max_audio_duration:.2f}s")
             timestamp_segments = self.get_transcribe_timestamps(audio, config, 0, max_audio_duration)
 
             # Get speech timestamps from full audio file
@@ -164,6 +165,10 @@ class AbstractTranscription(ABC):
 
             # A deque of transcribed segments that is passed to the next segment as a prompt
             prompt_window = deque()
+
+            if len(merged) > 0:
+                last_end = merged[-1].get('end', 0)
+                print(f">> Segments cover up to {last_end:.2f}s of {max_audio_duration:.2f}s total")
 
             print("Processing timestamps:")
             pprint(merged)
@@ -206,14 +211,28 @@ class AbstractTranscription(ABC):
                 print("Running whisper from ", format_timestamp(segment_start), " to ", format_timestamp(segment_end), ", duration: ", 
                     segment_duration, "expanded: ", segment_expand_amount, "prompt: ", segment_prompt, "language: ", detected_language)
 
-                perf_start_time = time.perf_counter()
-
                 scaled_progress_listener = SubTaskProgressListener(progressListener, base_task_total=progress_total_duration, 
                                                                    sub_task_start=segment_start - progress_start_offset, sub_task_total=segment_duration) 
                 segment_result = whisperCallable.invoke(segment_audio, segment_index, segment_prompt, detected_language, progress_listener=scaled_progress_listener)
 
-                perf_end_time = time.perf_counter()
-                print("Whisper took {} seconds".format(perf_end_time - perf_start_time))
+                # Retry uncovered tail: if whisper stopped early, re-process the remaining audio
+                if segment_result["segments"]:
+                    last_whisper_end = max(seg['end'] for seg in segment_result["segments"])
+                    remaining = segment_duration - last_whisper_end
+
+                    if remaining > MIN_SEGMENT_DURATION:
+                        print(f">> Whisper stopped at {format_timestamp(segment_start + last_whisper_end)}, "
+                              f"retrying remaining {remaining:.1f}s")
+                        retry_audio = self.get_audio_segment(audio,
+                                        start_time=str(segment_start + last_whisper_end),
+                                        duration=str(remaining))
+                        retry_result = whisperCallable.invoke(retry_audio, segment_index, None, detected_language)
+
+                        for seg in retry_result["segments"]:
+                            seg['start'] += last_whisper_end
+                            seg['end'] += last_whisper_end
+                            segment_result["segments"].append(seg)
+                        segment_result['text'] += retry_result.get('text', '')
 
                 adjusted_segments = self.adjust_timestamp(segment_result["segments"], adjust_seconds=segment_start, max_source_time=segment_duration)
 
@@ -241,6 +260,10 @@ class AbstractTranscription(ABC):
                 
             if detected_language is not None:
                 result['language'] = detected_language
+
+            if result['segments']:
+                last_ts = result['segments'][-1].get('end', 0)
+                print(f">> Transcription covers up to {last_ts:.2f}s of {max_audio_duration:.2f}s audio")
         finally:
             # Notify progress listener that we are done
             if progressListener is not None:

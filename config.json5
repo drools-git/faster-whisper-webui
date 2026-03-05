@@ -127,6 +127,7 @@
     "compression_ratio_threshold": 2.4,
     // If the average log probability is lower than this value, treat the decoding as failed
     "logprob_threshold": -1.0,
-    // If the probability of the <no-speech> token is higher than this value AND the decoding has failed due to `logprob_threshold`, consider the segment as silence
-    "no_speech_threshold": 0.6
+    // If the probability of the <no-speech> token is higher than this value AND the decoding has failed due to `logprob_threshold`, consider the segment as silence.
+    // Higher values (e.g. 0.8) prevent whisper from dropping quiet speech at segment edges.
+    "no_speech_threshold": 0.8
 }

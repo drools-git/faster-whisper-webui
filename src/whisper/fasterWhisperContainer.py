@@ -41,29 +41,33 @@ class FasterWhisperContainer(AbstractWhisperContainer):
         return None
 
     def _create_model(self):
-        print("Loading faster whisper model " + self.model_name + " for device " + str(self.device))
+        import torch
         model_config = self._get_model_config()
         
         if model_config.type == "whisper" and model_config.url not in ["tiny", "base", "small", "medium", "large", "large-v2"]:
             raise Exception("FasterWhisperContainer does not yet support Whisper models. Use ct2-transformers-converter to convert the model to a faster-whisper model.")
 
         device = self.device
-
         if (device is None):
             device = "auto"
 
         model_path = self._resolve_model_path(model_config)
-        print("Loading model from: " + str(model_path))
+
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            print(f">> CUDA available: {gpu_name}")
+        else:
+            print(">> CUDA not available, using CPU")
+        print(f">> Loading model '{self.model_name}' from: {model_path}")
+        print(f">> Device: {device}, Compute type: {self.compute_type}")
+
+        import time
+        start = time.time()
         model = WhisperModel(model_size_or_path=model_path, device=device, compute_type=self.compute_type)
+        print(f">> Model loaded in {time.time() - start:.2f}s")
         return model
 
     def _resolve_model_path(self, model_config: ModelConfig) -> str:
-        """
-        Resolve the model path:
-        1. FASTER_WHISPER_MODEL_DIR env var (from .env) + model name
-        2. Otherwise pass the model name as-is to WhisperModel, which checks
-           the huggingface cache and auto-downloads if needed
-        """
         model_name = model_config.url
         env_dir = os.environ.get("FASTER_WHISPER_MODEL_DIR")
 
