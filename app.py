@@ -520,7 +520,7 @@ def create_ui(app_config: ApplicationConfig):
     else:
         print("Queue mode disabled - progress bars will not be shown.")
    
-    demo.launch(share=app_config.share, server_name=app_config.server_name, server_port=app_config.server_port,quiet=True)
+    demo.launch(share=app_config.share, server_name=app_config.server_name, server_port=app_config.server_port,quiet=False)
     
     # Clean up
     ui.close()

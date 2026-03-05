@@ -1,9 +1,12 @@
+import os
 from tempfile import mkdtemp
 from typing import List
 from yt_dlp import YoutubeDL
 
 import yt_dlp
 from yt_dlp.postprocessor import PostProcessor
+
+DOWNLOADS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "downloads")
 
 class FilenameCollectorPP(PostProcessor):
     def __init__(self):
@@ -68,6 +71,24 @@ def _perform_download(url: str, maxDuration: int = None, outputTemplate: str = N
     for filename in filename_collector.filenames:
         result.append(filename)
         print("Downloaded " + filename)
+
+    # Also save the full video to the downloads folder
+    try:
+        os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+        video_opts = {
+            "format": "bestvideo+bestaudio/best",
+            "paths": {"home": DOWNLOADS_DIR},
+            "outtmpl": "%(title)s [%(id)s].%(ext)s",
+            "quiet": True,
+            "no_warnings": True,
+        }
+        if playlistItems:
+            video_opts["playlist_items"] = playlistItems
+        with YoutubeDL(video_opts) as ydl:
+            ydl.download([url])
+        print("Video saved to " + DOWNLOADS_DIR)
+    except Exception as e:
+        print("Could not save video copy: " + str(e))
 
     return result 
 
