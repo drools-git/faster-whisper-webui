@@ -474,7 +474,7 @@ def create_ui(app_config: ApplicationConfig):
 
     simple_inputs = lambda : [
         gr.Dropdown(choices=whisper_models, value=app_config.default_model_name, label="Model"),
-        gr.Dropdown(choices=sorted(get_language_names()), label="Language (auto-detect if empty)", value=app_config.language),
+        gr.Dropdown(choices=get_language_names(), label="Language (auto-detect if empty)", value=app_config.language),
         gr.Text(label="URL (YouTube, etc.)"),
         gr.File(label="Upload Files", file_count="multiple"),
         gr.Audio(source="microphone", type="filepath", label="Microphone Input"),

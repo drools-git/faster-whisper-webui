@@ -136,8 +136,10 @@ def get_language_from_name(language, default=None) -> Language:
     return _FROM_LANGUAGE_NAME.get(language.lower() if language else None, default)
 
 def get_language_names():
-    """Return a list of language names."""
-    return [language.name for language in LANGUAGES]
+    """Return a list of language names with English and Spanish pinned at the top."""
+    pinned = ["English", "Spanish"]
+    rest = sorted([lang.name for lang in LANGUAGES if lang.name not in pinned])
+    return pinned + ["───────────"] + rest
 
 if __name__ == "__main__":
     # Test lookup
